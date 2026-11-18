@@ -1,8 +1,8 @@
 import throttle from "lodash.throttle";
-import { addPassiveEventListener } from './passive-event-listeners';
+import { addPassiveEventListener, removePassiveEventListener } from './passive-event-listeners';
 
-// The eventHandler will execute at a rate of 15fps
-const eventThrottler = (eventHandler)  => throttle(eventHandler, 66);
+// The eventHandler will execute at a rate of 15fps by default
+const eventThrottler = (eventHandler, throttleAmount = 66)  => throttle(eventHandler, throttleAmount);
 
 const scrollSpy = {
 
@@ -10,26 +10,41 @@ const scrollSpy = {
   spySetState: [],
   scrollSpyContainers: [],
 
-  mount(scrollSpyContainer) {
+  mount(scrollSpyContainer, throttle) {
     if (scrollSpyContainer) {
       const eventHandler = eventThrottler((event) => {
         scrollSpy.scrollHandler(scrollSpyContainer);
-      });
+      }, throttle);
       scrollSpy.scrollSpyContainers.push(scrollSpyContainer);
       addPassiveEventListener(scrollSpyContainer, 'scroll', eventHandler);
+      return () => {
+        removePassiveEventListener(scrollSpyContainer, 'scroll', eventHandler);
+        scrollSpy.scrollSpyContainers.splice(scrollSpy.scrollSpyContainers.indexOf(scrollSpyContainer), 1);
+      };
     }
-    
+    return () => {};
   },
 
   isMounted(scrollSpyContainer) {
     return scrollSpy.scrollSpyContainers.indexOf(scrollSpyContainer) !== -1;
   },
 
+  currentPositionX(scrollSpyContainer) {
+    if(scrollSpyContainer === document) {
+      let supportPageOffset = window.scrollY !== undefined;
+      let isCSS1Compat = ((document.compatMode || "") === "CSS1Compat");
+      return supportPageOffset ? window.scrollX : isCSS1Compat ?
+          document.documentElement.scrollLeft : document.body.scrollLeft;
+    } else {
+      return scrollSpyContainer.scrollLeft;
+    }
+  },
+
   currentPositionY(scrollSpyContainer) {
     if(scrollSpyContainer === document) {
-      let supportPageOffset = window.pageXOffset !== undefined;
+      let supportPageOffset = window.scrollX !== undefined;
       let isCSS1Compat = ((document.compatMode || "") === "CSS1Compat");
-      return supportPageOffset ? window.pageYOffset : isCSS1Compat ?
+      return supportPageOffset ? window.scrollY : isCSS1Compat ?
       document.documentElement.scrollTop : document.body.scrollTop;
     } else {
       return scrollSpyContainer.scrollTop;
@@ -38,7 +53,7 @@ const scrollSpy = {
 
   scrollHandler(scrollSpyContainer) {
     let callbacks = scrollSpy.scrollSpyContainers[scrollSpy.scrollSpyContainers.indexOf(scrollSpyContainer)].spyCallbacks || [];
-    callbacks.forEach(c => c(scrollSpy.currentPositionY(scrollSpyContainer)))
+    callbacks.forEach(c => c(scrollSpy.currentPositionX(scrollSpyContainer), scrollSpy.currentPositionY(scrollSpyContainer)));
   },
 
   addStateHandler(handler) {
@@ -47,14 +62,12 @@ const scrollSpy = {
 
   addSpyHandler(handler, scrollSpyContainer) {
     let container = scrollSpy.scrollSpyContainers[scrollSpy.scrollSpyContainers.indexOf(scrollSpyContainer)];
-    
+
     if(!container.spyCallbacks) {
       container.spyCallbacks = [];
     }
 
     container.spyCallbacks.push(handler);
-
-    handler(scrollSpy.currentPositionY(scrollSpyContainer));
   },
 
   updateStates() {
@@ -62,9 +75,9 @@ const scrollSpy = {
   },
 
   unmount(stateHandler, spyHandler) {
-    scrollSpy.scrollSpyContainers.forEach(c => c.spyCallbacks && c.spyCallbacks.length && c.spyCallbacks.splice(c.spyCallbacks.indexOf(spyHandler), 1))
+    scrollSpy.scrollSpyContainers.forEach(c => c.spyCallbacks && c.spyCallbacks.length && c.spyCallbacks.indexOf(spyHandler) > -1 && c.spyCallbacks.splice(c.spyCallbacks.indexOf(spyHandler), 1))
 
-    if(scrollSpy.spySetState && scrollSpy.spySetState.length) {
+    if(scrollSpy.spySetState && scrollSpy.spySetState.length && scrollSpy.spySetState.indexOf(stateHandler) > -1) {
       scrollSpy.spySetState.splice(scrollSpy.spySetState.indexOf(stateHandler), 1);
     }
 

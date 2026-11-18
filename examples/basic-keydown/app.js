@@ -1,7 +1,5 @@
-"use strict";
-
-import React     from 'react';
-import ReactDOM  from 'react-dom';
+import React from "react";
+import * as ReactDOM from "react-dom/client";
 import Scroll    from 'react-scroll';
 
 var Link       = Scroll.Link;
@@ -49,7 +47,11 @@ class Section extends React.Component{
           <div className="container-fluid">
             <div className="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
               <ul className="nav navbar-nav">
-                <li>  <input onKeyDown={e => {() => console.log("keydown"), scroll.scrollMore(500) }}/>
+                <li>  <input onKeyDown={e => {
+                    console.log("keydown");
+                    scroll.scrollMore(500);
+                    e.stopPropagation();
+                }}/>
                   <a onClick={() => scroll.scrollTo(100)}>Scroll To 100!</a>
                 </li>
               </ul>
@@ -122,7 +124,8 @@ class Section extends React.Component{
 };
 
 
-ReactDOM.render(
-  <Section />,
-  document.getElementById('example')
+ReactDOM.createRoot(document.getElementById("example")).render(
+  <React.StrictMode>
+    <Section />
+  </React.StrictMode>
 );
